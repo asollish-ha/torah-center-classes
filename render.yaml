@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: torah-center-classes-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: YOUTUBE_API_KEY
+        sync: false
+      - key: YOUTUBE_CHANNEL_ID
+        sync: false
+      - key: SOUNDCLOUD_CLIENT_ID
+        sync: false
+      - key: SOUNDCLOUD_USERNAME
+        sync: false
+      - key: REFRESH_INTERVAL_SECONDS
+        value: "3600"
+      - key: CORS_ORIGINS
+        value: https://torah-center-classes.onrender.com
+
+  - type: web
+    name: torah-center-classes
+    runtime: static
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_BASE
+        value: https://torah-center-classes-api.onrender.com/api
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
