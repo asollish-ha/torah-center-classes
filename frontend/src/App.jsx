@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Sidebar from "./components/Sidebar";
 import MobileHeader from "./components/MobileHeader";
 import BottomTabBar from "./components/BottomTabBar";
@@ -33,6 +33,9 @@ export default function App() {
   const [shareItem, setShareItem] = useState(null);
   const [toast, setToast] = useState(null);
 
+  const audioIframeRef = useRef(null);
+  const audioWidgetRef = useRef(null);
+
   useEffect(() => {
     fetchClasses()
       .then(setFeed)
@@ -40,22 +43,6 @@ export default function App() {
   }, []);
 
   useEffect(() => saveSavedIds(savedIds), [savedIds]);
-
-  // Simulated playback clock — ticks currentTime while a class is "playing" and
-  // stops automatically at duration end. Swap for a real <audio> element once
-  // real streaming URLs are available from the backend.
-  useEffect(() => {
-    if (!audio.playing) return;
-    const id = setInterval(() => {
-      setAudio((a) => {
-        if (!a.playing) return a;
-        const next = a.currentTime + 1;
-        if (next >= a.duration) return { ...a, playing: false, currentTime: a.duration };
-        return { ...a, currentTime: next };
-      });
-    }, 1000);
-    return () => clearInterval(id);
-  }, [audio.playing]);
 
   const playlists = useMemo(() => {
     if (!feed) return [];
@@ -104,6 +91,84 @@ export default function App() {
     () => feed?.classes.find((c) => c.id === audio.classId) || null,
     [feed, audio.classId]
   );
+  const audioEmbedUrl = audioItem?.sources.find((s) => s.type === "audio")?.embed_url;
+
+  // Real playback via the SoundCloud Widget JS API — the hidden <iframe> below
+  // is remounted (via `key`) whenever the track changes, and this effect
+  // attaches a fresh SC.Widget to it and binds real playback events so our
+  // React state mirrors what's actually playing (not a simulated clock).
+  useEffect(() => {
+    if (!audioItem || !audioEmbedUrl) return;
+    let cancelled = false;
+
+    const attach = () => {
+      if (cancelled || !audioIframeRef.current || !window.SC) return;
+      const widget = window.SC.Widget(audioIframeRef.current);
+      audioWidgetRef.current = widget;
+      const { Events } = window.SC.Widget;
+
+      widget.bind(Events.READY, () => {
+        widget.play();
+        widget.getDuration((ms) =>
+          setAudio((a) => (a.classId === audioItem.id ? { ...a, duration: ms / 1000 } : a))
+        );
+      });
+      widget.bind(Events.PLAY, () =>
+        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: true } : a))
+      );
+      widget.bind(Events.PAUSE, () =>
+        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: false } : a))
+      );
+      widget.bind(Events.FINISH, () =>
+        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: false, currentTime: a.duration } : a))
+      );
+      widget.bind(Events.PLAY_PROGRESS, (data) =>
+        setAudio((a) => (a.classId === audioItem.id ? { ...a, currentTime: data.currentPosition / 1000 } : a))
+      );
+    };
+
+    if (window.SC) {
+      attach();
+      return () => {
+        cancelled = true;
+      };
+    }
+    const pollId = setInterval(() => {
+      if (window.SC) {
+        clearInterval(pollId);
+        attach();
+      }
+    }, 100);
+    return () => {
+      cancelled = true;
+      clearInterval(pollId);
+    };
+  }, [audioItem?.id, audioEmbedUrl]);
+
+  const togglePlay = () => {
+    const widget = audioWidgetRef.current;
+    if (!widget) return;
+    if (audio.playing) widget.pause();
+    else widget.play();
+  };
+
+  const seekAudio = (t) => {
+    const widget = audioWidgetRef.current;
+    if (!widget) return;
+    const clamped = Math.min(Math.max(t, 0), audio.duration);
+    widget.seekTo(clamped * 1000);
+    setAudio((a) => ({ ...a, currentTime: clamped }));
+  };
+
+  const skipAudio = (delta) => {
+    const widget = audioWidgetRef.current;
+    if (!widget) return;
+    widget.getPosition((ms) => {
+      const next = Math.min(Math.max(ms / 1000 + delta, 0), audio.duration);
+      widget.seekTo(next * 1000);
+      setAudio((a) => ({ ...a, currentTime: next }));
+    });
+  };
 
   const toggleSaved = (id) => {
     setSavedIds((prev) => {
@@ -126,7 +191,7 @@ export default function App() {
       return;
     }
     if (audio.classId === item.id) {
-      setAudio((a) => ({ ...a, playing: !a.playing }));
+      togglePlay();
       return;
     }
     const src = item.sources.find((s) => s.type === "audio");
@@ -219,11 +284,22 @@ export default function App() {
 
       <BottomTabBar activeTab={activeTab} onTabChange={goHome} />
 
+      {audioItem && audioEmbedUrl && (
+        <iframe
+          key={audioItem.id}
+          ref={audioIframeRef}
+          title="audio-player"
+          src={audioEmbedUrl}
+          allow="autoplay"
+          className="hidden"
+        />
+      )}
+
       {audioItem && !showAudioFull && (
         <MiniPlayer
           item={audioItem}
           audio={audio}
-          onTogglePlay={() => setAudio((a) => ({ ...a, playing: !a.playing }))}
+          onTogglePlay={togglePlay}
           onExpand={() => setShowAudioFull(true)}
         />
       )}
@@ -234,11 +310,9 @@ export default function App() {
           audio={audio}
           isSaved={savedIds.has(audioItem.id)}
           onCollapse={() => setShowAudioFull(false)}
-          onTogglePlay={() => setAudio((a) => ({ ...a, playing: !a.playing }))}
-          onSeek={(t) => setAudio((a) => ({ ...a, currentTime: Math.min(Math.max(t, 0), a.duration) }))}
-          onSkip={(delta) =>
-            setAudio((a) => ({ ...a, currentTime: Math.min(Math.max(a.currentTime + delta, 0), a.duration) }))
-          }
+          onTogglePlay={togglePlay}
+          onSeek={seekAudio}
+          onSkip={skipAudio}
           onToggleSave={() => toggleSaved(audioItem.id)}
           onShare={() => setShareItem(audioItem)}
           onDownload={() => setToast(`Downloading "${audioItem.title}"…`)}
