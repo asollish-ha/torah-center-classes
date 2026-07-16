@@ -1,8 +1,9 @@
 import { formatDate, primaryDuration } from "../lib/format";
-import { ChevronLeftIcon, PlayIcon, HeartIcon, ShareIcon, DownloadIcon } from "./icons";
+import { ChevronLeftIcon, PlayIcon, EqualizerIcon, HeartIcon, ShareIcon, DownloadIcon } from "./icons";
 import IconButton from "./IconButton";
 
-export default function VideoPlayer({ item, isSaved, onBack, onToggleSave, onShare, onDownload }) {
+export default function VideoPlayer({ item, isSaved, onBack, onToggleSave, onShare, onDownload, onListen }) {
+  const hasAudio = item.types.includes("audio");
   const duration = primaryDuration(item.sources);
   const metaLine = [item.series[0], formatDate(item.published_at), duration].filter(Boolean).join(" · ");
   const videoSource = item.sources.find((s) => s.type === "video");
@@ -55,6 +56,20 @@ export default function VideoPlayer({ item, isSaved, onBack, onToggleSave, onSha
       </p>
 
       <div className="flex items-center gap-3">
+        {hasAudio && (
+          // Lets someone who tapped "Watch" (or landed here via the row's
+          // quick-play, which prefers video only when there's no audio)
+          // switch to the audio version instead of getting stuck with only
+          // the video, no way back to audio, and a Back button that exits
+          // to the browse list entirely.
+          <button
+            onClick={onListen}
+            className="flex-1 h-12 rounded-full bg-white border border-border-soft text-navy flex items-center justify-center gap-2 font-heading font-bold text-[14.5px]"
+          >
+            <EqualizerIcon width={16} height={16} />
+            Listen instead
+          </button>
+        )}
         <IconButton active={isSaved} onClick={onToggleSave} label="Save">
           <HeartIcon filled={isSaved} />
         </IconButton>

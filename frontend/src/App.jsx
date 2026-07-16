@@ -16,7 +16,6 @@ import Toast from "./components/Toast";
 import { fetchClasses } from "./lib/api";
 import { loadSavedIds, saveSavedIds } from "./lib/storage";
 import { categoryForClass, buildTopicCategories } from "./lib/topics";
-import { primaryType } from "./lib/format";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -98,11 +97,10 @@ export default function App() {
       classes = classes.filter((c) => savedIds.has(c.id));
     }
     if (typeFilter !== "all") {
-      // A class with a video recording almost always has a duplicate
-      // audio-only source too — treat "has video" as the class's single
-      // primary type so the Video/Audio tabs actually partition the list
-      // instead of both matching every video class.
-      classes = classes.filter((c) => primaryType(c.types) === typeFilter);
+      // A class can offer both formats (video + audio), and both are now
+      // independently playable (see ClassDetail's Watch/Listen buttons), so
+      // it should show up under both tabs rather than only "Video".
+      classes = classes.filter((c) => c.types.includes(typeFilter));
     }
     if (seriesFilter !== "Topics") {
       // seriesFilter can be either an exact series name (from a featured
@@ -249,16 +247,37 @@ export default function App() {
     setAudio({ classId: item.id, playing: true, currentTime: 0, duration: src?.duration_sec || 0 });
   };
 
-  // Quick-play shortcut for the row's round Play button in the browse list:
-  // video is the default when a class has both formats (it's the richer
-  // experience and matches what used to happen before formats were split),
-  // audio otherwise. The explicit choice between the two lives on the detail
+  // Same track-selection logic as playAudio, but one-directional instead of
+  // a toggle: it guarantees the class's audio ends up playing. playAudio's
+  // toggle is right for the row's round Play/Pause button (its icon reflects
+  // and controls real toggle state), but wrong for "Listen"/"Listen instead"
+  // buttons — those mean "switch to audio," and if that class's audio was
+  // already playing in the background (e.g. from the mini player), reusing
+  // playAudio would flip it to paused instead of leaving it playing.
+  const ensureAudioPlaying = (item) => {
+    if (audio.classId === item.id) {
+      if (!audio.playing) {
+        const widget = audioWidgetRef.current;
+        if (widget) widget.play();
+      }
+      return;
+    }
+    const src = item.sources.find((s) => s.type === "audio");
+    setAudio({ classId: item.id, playing: true, currentTime: 0, duration: src?.duration_sec || 0 });
+  };
+
+  // Quick-play shortcut for the row's round Play button in the browse list.
+  // The whole point of that button is "play immediately without navigating
+  // away from the list" — which is only actually possible for audio (video
+  // needs the player screen), so prefer audio whenever a class has it, and
+  // only fall back to navigating to the video screen for video-only
+  // classes. Explicitly choosing to watch instead lives on the detail
   // screen (see ClassDetail's Watch/Listen buttons below).
   const playItem = (item) => {
-    if (item.types.includes("video")) {
-      playVideo(item);
-    } else {
+    if (item.types.includes("audio")) {
       playAudio(item);
+    } else {
+      playVideo(item);
     }
   };
 
@@ -331,7 +350,7 @@ export default function App() {
             onShare={() => setShareItem(selectedItem)}
             onDownload={() => setToast(`Downloading "${selectedItem.title}"…`)}
             onPlayVideo={() => playVideo(selectedItem)}
-            onPlayAudio={() => playAudio(selectedItem)}
+            onPlayAudio={() => ensureAudioPlaying(selectedItem)}
           />
         )}
 
@@ -343,6 +362,18 @@ export default function App() {
             onToggleSave={() => toggleSaved(selectedItem.id)}
             onShare={() => setShareItem(selectedItem)}
             onDownload={() => setToast(`Downloading "${selectedItem.title}"…`)}
+            onListen={() => {
+              // Switch back to the poster/detail screen and make sure audio
+              // is playing — mirrors tapping "Listen" from there, so
+              // watching a class doesn't strand the user with no way back
+              // to the audio version they might have started this class
+              // with. Uses ensureAudioPlaying (not playAudio) since this is
+              // a one-directional "switch to audio" action, not a toggle:
+              // if the audio was already playing in the background, this
+              // should leave it playing, not pause it.
+              ensureAudioPlaying(selectedItem);
+              setScreen("detail");
+            }}
           />
         )}
       </main>

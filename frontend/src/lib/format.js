@@ -18,21 +18,10 @@ export function primaryDuration(sources) {
   return withDuration ? formatDuration(withDuration.duration_sec) : null;
 }
 
-// Classes with a video recording almost always also carry an audio-only
-// source (e.g. the same talk re-uploaded to SoundCloud), so a class's
-// `types` array is often ["audio", "video"]. Displaying that literally as
-// "audio + video" is confusing and makes the Video/Audio filter tabs
-// useless (every video class also matches "Audio"). Treat "has video" as
-// the single, primary type — audio-only applies only when no video exists.
-export function primaryType(types) {
-  return types.includes("video") ? "video" : "audio";
-}
-
-// Label shown on each row in the browse list. Unlike primaryType() (which
-// collapses dual-format classes to "video" so the Video/Audio filter tabs
-// stay meaningful), this label should tell the user a class actually offers
-// both a Watch and a Listen option before they tap in, since ClassDetail now
-// surfaces both as separate buttons for those classes.
+// Label shown on each row in the browse list, and used to drive the
+// Video/Audio filter tabs (a class shows under a tab if its types include
+// that format — a class with both shows under both, since both are
+// independently playable via ClassDetail's Watch/Listen buttons).
 export function formatTypeLabel(types) {
   const hasVideo = types.includes("video");
   const hasAudio = types.includes("audio");
