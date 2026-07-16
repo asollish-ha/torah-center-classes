@@ -26,7 +26,7 @@ export default function App() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
-  const [seriesFilter, setSeriesFilter] = useState("All Topics");
+  const [seriesFilter, setSeriesFilter] = useState("Topics");
 
   const [screen, setScreen] = useState("browse"); // browse | detail | video
   const [selectedId, setSelectedId] = useState(null);
@@ -104,7 +104,7 @@ export default function App() {
       // instead of both matching every video class.
       classes = classes.filter((c) => primaryType(c.types) === typeFilter);
     }
-    if (seriesFilter !== "All Topics") {
+    if (seriesFilter !== "Topics") {
       // seriesFilter can be either an exact series name (from a featured
       // playlist card) or a broad topic category (from the dropdown) — a
       // class matches if either kind of value applies to it.

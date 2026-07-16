@@ -1,21 +1,29 @@
-// The upstream feed has ~35 individual series (JLI courses, Kabbalah Café
+// The upstream feed has 180+ individual series (JLI courses, Kabbalah Café
 // cohorts, yearly Torah Studies cycles, one-off holiday boot camps, etc).
 // That's too many to be a useful "Topics" filter, so we group them into a
 // small set of broad categories here. Featured playlist cards still filter
 // by the exact series name (see App.jsx) — this layer only powers the
-// "All Topics" dropdown.
+// "Topics" dropdown.
 const CATEGORY_RULES = [
   { name: "Torah Studies", test: (s) => s.startsWith("Torah Studies") },
   { name: "JLI Courses", test: (s) => s.startsWith("JLI") },
-  { name: "Kabbalah Café", test: (s) => s.startsWith("Kabbalah Caf") },
+  // "Kabbalah Café"/"Kabbalah Cafe" and "Kabbalah & Coffee" are the same
+  // ongoing series rebranded/retitled across different cohorts over the
+  // years — group them together rather than splintering into two topics.
+  {
+    name: "Kabbalah Café",
+    test: (s) => s.startsWith("Kabbalah Caf") || s.startsWith("Kabbalah & Coffee"),
+  },
   {
     name: "Holidays & Seasons",
-    test: (s) => /High Holiday|Pesach Boot Camp|Purim Boot Camp/.test(s),
+    test: (s) =>
+      /High Holiday|Pesach Boot Camp|Purim Boot Camp|Chanukah Classes|Pesach Classes|Shavuot Classes/.test(s),
   },
   {
     name: "Ongoing Classes",
     test: (s) =>
-      ["Daily Wisdom with Rabbi Ari Sollish", "Sunday Kolel - Year 3", "The Hebrew Course"].includes(s),
+      ["Daily Wisdom with Rabbi Ari Sollish", "Sunday Kolel - Year 3", "The Hebrew Course"].includes(s) ||
+      s.startsWith("Semichas Chaver Chabad"),
   },
 ];
 

@@ -3,7 +3,7 @@ import { ChevronDownIcon } from "./icons";
 
 export default function TopicsDropdown({ series, value, onChange }) {
   const [open, setOpen] = useState(false);
-  const options = ["All Topics", ...series];
+  const options = ["Topics", ...series];
 
   return (
     <div className="relative">
