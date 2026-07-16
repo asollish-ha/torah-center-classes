@@ -22,7 +22,18 @@ API_BASE = "https://api-v2.soundcloud.com"
 
 async def _get(client: httpx.AsyncClient, endpoint: str, **params) -> dict:
     params.setdefault("client_id", settings.soundcloud_client_id)
-    resp = await client.get(endpoint, params=params)
+    # httpx.Client.get(url, params=...) *replaces* any query string already
+    # present on `url` instead of merging with it. That's harmless for plain
+    # endpoints, but `endpoint` here is often a SoundCloud `next_href` cursor
+    # that already carries its own `offset`/`limit` query params — passing
+    # those through `params=` would silently strip them, causing SoundCloud
+    # to fall back to a tiny default page and re-serve the first page over
+    # and over (which then trips the pagination loop guard after ~200
+    # tracks instead of walking the full multi-thousand-track catalog).
+    # `copy_merge_params` merges instead of overwriting, so both the
+    # existing cursor and client_id survive.
+    url = httpx.URL(endpoint).copy_merge_params(params)
+    resp = await client.get(url)
     resp.raise_for_status()
     return resp.json()
 
