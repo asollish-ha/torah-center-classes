@@ -14,7 +14,7 @@ import NowPlaying from "./components/NowPlaying";
 import ShareSheet from "./components/ShareSheet";
 import Toast from "./components/Toast";
 import { fetchClasses } from "./lib/api";
-import { loadSavedIds, saveSavedIds } from "./lib/storage";
+import { loadSavedIds, saveSavedIds, loadProgress, saveProgress, clearProgress } from "./lib/storage";
 import { categoryForClass, buildTopicCategories } from "./lib/topics";
 
 export default function App() {
@@ -36,6 +36,15 @@ export default function App() {
 
   const audioIframeRef = useRef(null);
   const audioWidgetRef = useRef(null);
+  // Mirrors audio.currentTime/duration outside React state so the widget-
+  // attach effect's cleanup (and other event bindings) can always read the
+  // latest position — state set via setAudio inside a closure created on an
+  // earlier render would be stale by the time cleanup runs.
+  const audioProgressRef = useRef({ currentTime: 0, duration: 0 });
+  // Tracks the position at which progress was last written to localStorage,
+  // so a hard tab close/reload (which skips effect cleanup) doesn't lose
+  // more than a few seconds — see the throttled write in PLAY_PROGRESS.
+  const audioLastPersistRef = useRef(0);
 
   useEffect(() => {
     fetchClasses()
@@ -139,6 +148,9 @@ export default function App() {
   useEffect(() => {
     if (!audioItem || !audioEmbedUrl) return;
     let cancelled = false;
+    const classId = audioItem.id;
+    audioProgressRef.current = { currentTime: 0, duration: 0 };
+    audioLastPersistRef.current = 0;
 
     const attach = () => {
       if (cancelled || !audioIframeRef.current || !window.SC) return;
@@ -147,29 +159,59 @@ export default function App() {
       const { Events } = window.SC.Widget;
 
       widget.bind(Events.READY, () => {
+        // Resume from wherever the user left off last time, if anywhere.
+        const saved = loadProgress(classId, "audio");
+        if (saved && saved.currentTime > 0) {
+          widget.seekTo(saved.currentTime * 1000);
+          audioProgressRef.current.currentTime = saved.currentTime;
+          setAudio((a) => (a.classId === classId ? { ...a, currentTime: saved.currentTime } : a));
+        }
         widget.play();
-        widget.getDuration((ms) =>
-          setAudio((a) => (a.classId === audioItem.id ? { ...a, duration: ms / 1000 } : a))
-        );
+        widget.getDuration((ms) => {
+          audioProgressRef.current.duration = ms / 1000;
+          setAudio((a) => (a.classId === classId ? { ...a, duration: ms / 1000 } : a));
+        });
       });
       widget.bind(Events.PLAY, () =>
-        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: true } : a))
+        setAudio((a) => (a.classId === classId ? { ...a, playing: true } : a))
       );
-      widget.bind(Events.PAUSE, () =>
-        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: false } : a))
-      );
-      widget.bind(Events.FINISH, () =>
-        setAudio((a) => (a.classId === audioItem.id ? { ...a, playing: false, currentTime: a.duration } : a))
-      );
-      widget.bind(Events.PLAY_PROGRESS, (data) =>
-        setAudio((a) => (a.classId === audioItem.id ? { ...a, currentTime: data.currentPosition / 1000 } : a))
-      );
+      widget.bind(Events.PAUSE, () => {
+        setAudio((a) => (a.classId === classId ? { ...a, playing: false } : a));
+        saveProgress(classId, "audio", audioProgressRef.current.currentTime, audioProgressRef.current.duration);
+      });
+      widget.bind(Events.FINISH, () => {
+        setAudio((a) => (a.classId === classId ? { ...a, playing: false, currentTime: a.duration } : a));
+        clearProgress(classId, "audio");
+      });
+      widget.bind(Events.PLAY_PROGRESS, (data) => {
+        const t = data.currentPosition / 1000;
+        audioProgressRef.current.currentTime = t;
+        setAudio((a) => (a.classId === classId ? { ...a, currentTime: t } : a));
+        // Throttled write so a hard tab close mid-track (which skips the
+        // PAUSE/cleanup persistence below) doesn't lose more than ~5s.
+        if (t - audioLastPersistRef.current > 5) {
+          audioLastPersistRef.current = t;
+          saveProgress(classId, "audio", t, audioProgressRef.current.duration);
+        }
+      });
+    };
+
+    // Save wherever this track got to when switching away from it (to a
+    // different track, or unmounting entirely) — the PAUSE binding above
+    // already covers explicit pauses, but this also catches switching
+    // straight to a new track without one (e.g. tapping a different class's
+    // quick-play button while this one is still playing).
+    const persistOnTeardown = () => {
+      if (audioProgressRef.current.currentTime > 0) {
+        saveProgress(classId, "audio", audioProgressRef.current.currentTime, audioProgressRef.current.duration);
+      }
     };
 
     if (window.SC) {
       attach();
       return () => {
         cancelled = true;
+        persistOnTeardown();
       };
     }
     const pollId = setInterval(() => {
@@ -181,6 +223,7 @@ export default function App() {
     return () => {
       cancelled = true;
       clearInterval(pollId);
+      persistOnTeardown();
     };
   }, [audioItem?.id, audioEmbedUrl]);
 
@@ -248,13 +291,27 @@ export default function App() {
     setScreen("video");
   };
 
+  // Kicks off a track the app wasn't already playing. Seeds `currentTime`
+  // from any saved progress immediately (rather than waiting for the widget
+  // to become ready and seek) so the mini player doesn't flash "0:00" before
+  // jumping to the resume point.
+  const startNewAudioTrack = (item) => {
+    const src = item.sources.find((s) => s.type === "audio");
+    const saved = loadProgress(item.id, "audio");
+    setAudio({
+      classId: item.id,
+      playing: true,
+      currentTime: saved?.currentTime || 0,
+      duration: src?.duration_sec || saved?.duration || 0,
+    });
+  };
+
   const playAudio = (item) => {
     if (audio.classId === item.id) {
       togglePlay();
       return;
     }
-    const src = item.sources.find((s) => s.type === "audio");
-    setAudio({ classId: item.id, playing: true, currentTime: 0, duration: src?.duration_sec || 0 });
+    startNewAudioTrack(item);
   };
 
   // Same track-selection logic as playAudio, but one-directional instead of
@@ -272,8 +329,7 @@ export default function App() {
       }
       return;
     }
-    const src = item.sources.find((s) => s.type === "audio");
-    setAudio({ classId: item.id, playing: true, currentTime: 0, duration: src?.duration_sec || 0 });
+    startNewAudioTrack(item);
   };
 
   // Quick-play shortcut for the row's round Play button in the browse list.

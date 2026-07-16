@@ -1,12 +1,113 @@
+import { useEffect, useRef } from "react";
 import { formatDate, primaryDuration } from "../lib/format";
+import { loadProgress, saveProgress, clearProgress } from "../lib/storage";
 import { ChevronLeftIcon, PlayIcon, EqualizerIcon, HeartIcon, ShareIcon, DownloadIcon } from "./icons";
 import IconButton from "./IconButton";
+
+// Loads the YouTube IFrame Player API script once, no matter how many
+// VideoPlayer instances mount over the app's lifetime, and lets each caller
+// await its readiness independently (multiple callers can register with
+// window.onYouTubeIframeAPIReady — the API only ever calls it once globally).
+function loadYouTubeApi(onReady) {
+  if (window.YT && window.YT.Player) {
+    onReady();
+    return;
+  }
+  if (!document.getElementById("youtube-iframe-api")) {
+    const tag = document.createElement("script");
+    tag.id = "youtube-iframe-api";
+    tag.src = "https://www.youtube.com/iframe_api";
+    document.head.appendChild(tag);
+  }
+  const previous = window.onYouTubeIframeAPIReady;
+  window.onYouTubeIframeAPIReady = () => {
+    previous?.();
+    onReady();
+  };
+}
 
 export default function VideoPlayer({ item, isSaved, onBack, onToggleSave, onShare, onDownload, onListen }) {
   const hasAudio = item.types.includes("audio");
   const duration = primaryDuration(item.sources);
   const metaLine = [item.series[0], formatDate(item.published_at), duration].filter(Boolean).join(" · ");
   const videoSource = item.sources.find((s) => s.type === "video");
+
+  const containerRef = useRef(null);
+  const playerRef = useRef(null);
+  // Mirrors live playback position outside React state, since the effect's
+  // cleanup (and the polling interval) need the latest value without
+  // depending on state that would force the player to be recreated.
+  const progressRef = useRef({ currentTime: 0, duration: 0 });
+
+  // Real playback via the YouTube IFrame Player API (instead of a plain
+  // <iframe src=...>) so we can resume from a saved position and track
+  // progress as the class plays, the same way audio already does via the
+  // SoundCloud Widget API.
+  useEffect(() => {
+    // embed_url (not just id) gates whether this is a real, playable video —
+    // demo/fallback data can have a placeholder id with no embed_url, and
+    // should keep showing the "VIDEO EMBED" placeholder below rather than
+    // attempt to load a bogus YouTube video.
+    if (!videoSource?.embed_url || !videoSource?.id) return;
+    let cancelled = false;
+    let pollId = null;
+    const classId = item.id;
+    progressRef.current = { currentTime: 0, duration: 0 };
+
+    const create = () => {
+      if (cancelled || !containerRef.current || !window.YT?.Player) return;
+      const saved = loadProgress(classId, "video");
+
+      playerRef.current = new window.YT.Player(containerRef.current, {
+        videoId: videoSource.id,
+        playerVars: {
+          autoplay: 1,
+          playsinline: 1,
+          origin: window.location.origin,
+          start: saved?.currentTime ? Math.floor(saved.currentTime) : 0,
+        },
+        events: {
+          onReady: () => {
+            progressRef.current.duration = playerRef.current.getDuration() || 0;
+          },
+          onStateChange: (e) => {
+            const State = window.YT.PlayerState;
+            if (e.data === State.PLAYING) {
+              if (pollId) clearInterval(pollId);
+              pollId = setInterval(() => {
+                if (!playerRef.current) return;
+                const t = playerRef.current.getCurrentTime();
+                progressRef.current.currentTime = t;
+                saveProgress(classId, "video", t, progressRef.current.duration);
+              }, 5000);
+            } else if (pollId) {
+              clearInterval(pollId);
+              pollId = null;
+            }
+            if (e.data === State.PAUSED) {
+              saveProgress(classId, "video", progressRef.current.currentTime, progressRef.current.duration);
+            } else if (e.data === State.ENDED) {
+              clearProgress(classId, "video");
+            }
+          },
+        },
+      });
+    };
+
+    loadYouTubeApi(create);
+
+    return () => {
+      cancelled = true;
+      if (pollId) clearInterval(pollId);
+      // Persist final position before tearing down — covers navigating
+      // away (Back, Listen instead) without an explicit pause first.
+      if (progressRef.current.currentTime > 0) {
+        saveProgress(classId, "video", progressRef.current.currentTime, progressRef.current.duration);
+      }
+      playerRef.current?.destroy?.();
+      playerRef.current = null;
+    };
+  }, [item.id, videoSource?.embed_url, videoSource?.id]);
 
   return (
     <div>
@@ -19,14 +120,8 @@ export default function VideoPlayer({ item, isSaved, onBack, onToggleSave, onSha
       </button>
 
       <div className="relative w-full aspect-video rounded-detail overflow-hidden bg-[#0B2436] mb-4">
-        {videoSource?.embed_url ? (
-          <iframe
-            src={videoSource.embed_url}
-            title={item.title}
-            className="absolute inset-0 w-full h-full"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
+        {videoSource?.embed_url && videoSource?.id ? (
+          <div ref={containerRef} className="absolute inset-0 w-full h-full" />
         ) : (
           <>
             <span className="absolute inset-0 flex items-center justify-center">
