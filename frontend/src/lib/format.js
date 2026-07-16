@@ -27,3 +27,15 @@ export function primaryDuration(sources) {
 export function primaryType(types) {
   return types.includes("video") ? "video" : "audio";
 }
+
+// Label shown on each row in the browse list. Unlike primaryType() (which
+// collapses dual-format classes to "video" so the Video/Audio filter tabs
+// stay meaningful), this label should tell the user a class actually offers
+// both a Watch and a Listen option before they tap in, since ClassDetail now
+// surfaces both as separate buttons for those classes.
+export function formatTypeLabel(types) {
+  const hasVideo = types.includes("video");
+  const hasAudio = types.includes("audio");
+  if (hasVideo && hasAudio) return "video + audio";
+  return hasVideo ? "video" : "audio";
+}
