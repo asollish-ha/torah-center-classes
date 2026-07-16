@@ -1,4 +1,4 @@
-import { HomeIcon, BookmarkIcon } from "./icons";
+import { HomeIcon, HeartIcon } from "./icons";
 
 export default function Sidebar({ activeTab, onTabChange }) {
   return (
@@ -6,14 +6,14 @@ export default function Sidebar({ activeTab, onTabChange }) {
       <div className="flex items-center gap-2.5 mb-8">
         <img src="/icon.png" alt="" className="w-[34px] h-[34px] rounded-[10px] bg-white p-1" />
         <div className="font-heading font-bold text-[16px] text-white leading-tight">
-          Torah Center
+          The Torah Center
           <div className="font-body font-normal text-[12px] text-white/60">of Atlanta</div>
         </div>
       </div>
 
       <nav className="flex flex-col gap-1">
         <NavItem icon={<HomeIcon />} label="Home" active={activeTab === "home"} onClick={() => onTabChange("home")} />
-        <NavItem icon={<BookmarkIcon />} label="Saved" active={activeTab === "saved"} onClick={() => onTabChange("saved")} />
+        <NavItem icon={<HeartIcon />} label="Favorites" active={activeTab === "saved"} onClick={() => onTabChange("saved")} />
       </nav>
 
       <div className="mt-auto text-[12.5px] text-white/50 leading-snug">

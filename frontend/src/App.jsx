@@ -15,6 +15,7 @@ import ShareSheet from "./components/ShareSheet";
 import Toast from "./components/Toast";
 import { fetchClasses } from "./lib/api";
 import { loadSavedIds, saveSavedIds } from "./lib/storage";
+import { categoryForSeries, buildTopicCategories } from "./lib/topics";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -38,25 +39,55 @@ export default function App() {
 
   useEffect(() => {
     fetchClasses()
-      .then(setFeed)
+      .then((data) => {
+        // The upstream feed occasionally contains duplicate entries for the
+        // same class (same id repeated 2-3x). Duplicate React keys corrupt
+        // list reconciliation — filtered-out rows can get "orphaned" and
+        // stick around on screen. De-dupe by id defensively so the UI is
+        // correct even if the feed still has repeats.
+        const seen = new Set();
+        const classes = data.classes.filter((c) => {
+          if (seen.has(c.id)) return false;
+          seen.add(c.id);
+          return true;
+        });
+        setFeed({ ...data, classes });
+      })
       .catch((e) => setError(e.message));
   }, []);
 
   useEffect(() => saveSavedIds(savedIds), [savedIds]);
+
+  // Scroll to the top whenever the visible screen changes (browse -> detail ->
+  // video, or switching tabs) so navigating never leaves the user stranded
+  // wherever the previous screen happened to be scrolled.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [screen, selectedId, activeTab]);
 
   const playlists = useMemo(() => {
     if (!feed) return [];
     const bySeries = new Map();
     for (const c of feed.classes) {
       for (const s of c.series) {
-        if (!bySeries.has(s)) bySeries.set(s, { name: s, count: 0, mostRecent: c.published_at });
+        if (!bySeries.has(s)) {
+          bySeries.set(s, { name: s, count: 0, mostRecent: c.published_at, thumbnail: c.thumbnail });
+        }
         const entry = bySeries.get(s);
         entry.count += 1;
-        if (c.published_at > entry.mostRecent) entry.mostRecent = c.published_at;
+        // Use the thumbnail of the most recently published class in the
+        // series as the playlist's cover image, so cards show real artwork
+        // instead of a generic gradient wherever the feed provides one.
+        if (c.published_at > entry.mostRecent) {
+          entry.mostRecent = c.published_at;
+          entry.thumbnail = c.thumbnail;
+        }
       }
     }
     return [...bySeries.values()].sort((a, b) => (a.mostRecent < b.mostRecent ? 1 : -1));
   }, [feed]);
+
+  const topicCategories = useMemo(() => buildTopicCategories(feed?.series || []), [feed]);
 
   const filteredClasses = useMemo(() => {
     if (!feed) return [];
@@ -69,7 +100,14 @@ export default function App() {
       classes = classes.filter((c) => c.types.includes(typeFilter));
     }
     if (seriesFilter !== "All Topics") {
-      classes = classes.filter((c) => c.series.includes(seriesFilter));
+      // seriesFilter can be either an exact series name (from a featured
+      // playlist card) or a broad topic category (from the dropdown) — a
+      // class matches if either kind of value applies to it.
+      classes = classes.filter(
+        (c) =>
+          c.series.includes(seriesFilter) ||
+          c.series.some((s) => categoryForSeries(s) === seriesFilter)
+      );
     }
     if (searchQuery.trim()) {
       const needle = searchQuery.trim().toLowerCase();
@@ -227,7 +265,7 @@ export default function App() {
 
             <div className="flex items-center justify-between gap-3 mb-4">
               <TypeToggle value={typeFilter} onChange={setTypeFilter} />
-              <TopicsDropdown series={feed?.series || []} value={seriesFilter} onChange={setSeriesFilter} />
+              <TopicsDropdown series={topicCategories} value={seriesFilter} onChange={setSeriesFilter} />
             </div>
 
             {error && (

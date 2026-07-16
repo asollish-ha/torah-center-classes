@@ -14,8 +14,8 @@ export default function PlaylistsRow({ playlists, onSelect }) {
             className="shrink-0 w-[132px] text-left flex flex-col"
           >
             <div
-              className="relative w-[132px] h-[132px] rounded-thumb overflow-hidden shrink-0"
-              style={placeholderStyle(p.name)}
+              className="relative w-[132px] h-[132px] rounded-thumb overflow-hidden shrink-0 bg-cover bg-center"
+              style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : placeholderStyle(p.name)}
             >
               <span className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-navy/60 text-white text-[9px] font-mono">
                 {p.count} class{p.count === 1 ? "" : "es"}

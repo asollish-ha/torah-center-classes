@@ -1,10 +1,10 @@
-import { HomeIcon, BookmarkIcon } from "./icons";
+import { HomeIcon, HeartIcon } from "./icons";
 
 export default function BottomTabBar({ activeTab, onTabChange }) {
   return (
     <nav className="md:hidden fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-border flex items-center justify-around z-40">
       <TabButton icon={<HomeIcon />} label="Home" active={activeTab === "home"} onClick={() => onTabChange("home")} />
-      <TabButton icon={<BookmarkIcon />} label="Saved" active={activeTab === "saved"} onClick={() => onTabChange("saved")} />
+      <TabButton icon={<HeartIcon />} label="Favorites" active={activeTab === "saved"} onClick={() => onTabChange("saved")} />
     </nav>
   );
 }
