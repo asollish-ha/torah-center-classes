@@ -222,7 +222,17 @@ export default function App() {
 
   const openDetail = (item) => {
     setSelectedId(item.id);
-    setScreen("detail");
+    // Video classes have no separate "preview" step worth showing: the detail
+    // screen (ClassDetail) is just a static poster with a Play button, and
+    // VideoPlayer already surfaces the same title/series/description above
+    // the live embed. Routing video taps straight to "video" collapses what
+    // used to be "tap row -> poster -> tap Play -> video actually loads"
+    // into a single tap, matching the row's dedicated Play button which
+    // already jumps straight to "video" via playItem(). Audio classes keep
+    // going through "detail" first since there's no autoplaying embed there
+    // — the poster screen is the only place to read the description before
+    // committing to stream audio.
+    setScreen(item.types.includes("video") ? "video" : "detail");
   };
 
   const playItem = (item) => {
