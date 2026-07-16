@@ -39,6 +39,24 @@ export function categoryForSeries(series) {
   return OTHER_CATEGORY;
 }
 
+// A class's own title is a more reliable signal of its "real" topic than
+// the SoundCloud playlist(s) it happens to be filed under — playlists on
+// the upstream account sometimes include a handful of unrelated one-off
+// episodes (e.g. an old "Torah Studies 5780" holiday episode tucked into
+// the "Kabbalah & Coffee: Learning How to Love" playlist), which would
+// otherwise leak that class into the wrong Topics filter. So: prefer a
+// category match on the title first, and only fall back to the class's
+// series/playlist names when the title itself doesn't identify one.
+export function categoryForClass(item) {
+  const titleCategory = categoryForSeries(item.title);
+  if (titleCategory !== OTHER_CATEGORY) return titleCategory;
+  for (const s of item.series) {
+    const category = categoryForSeries(s);
+    if (category !== OTHER_CATEGORY) return category;
+  }
+  return OTHER_CATEGORY;
+}
+
 export function buildTopicCategories(seriesList) {
   const present = new Set(seriesList.map(categoryForSeries));
   return CATEGORY_ORDER.filter((c) => present.has(c));

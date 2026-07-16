@@ -15,7 +15,7 @@ import ShareSheet from "./components/ShareSheet";
 import Toast from "./components/Toast";
 import { fetchClasses } from "./lib/api";
 import { loadSavedIds, saveSavedIds } from "./lib/storage";
-import { categoryForSeries, buildTopicCategories } from "./lib/topics";
+import { categoryForClass, buildTopicCategories } from "./lib/topics";
 import { primaryType } from "./lib/format";
 
 export default function App() {
@@ -109,9 +109,7 @@ export default function App() {
       // playlist card) or a broad topic category (from the dropdown) — a
       // class matches if either kind of value applies to it.
       classes = classes.filter(
-        (c) =>
-          c.series.includes(seriesFilter) ||
-          c.series.some((s) => categoryForSeries(s) === seriesFilter)
+        (c) => c.series.includes(seriesFilter) || categoryForClass(c) === seriesFilter
       );
     }
     if (searchQuery.trim()) {
