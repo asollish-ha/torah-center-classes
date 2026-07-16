@@ -14,6 +14,7 @@ import httpx
 
 from ..config import settings
 from ..models import ClassItem, SourceRef, SourceType
+from .series_names import normalize_series_title
 
 log = logging.getLogger(__name__)
 
@@ -89,7 +90,7 @@ async def fetch_soundcloud_classes() -> list[ClassItem]:
 
         track_id_to_series: dict[int, set[str]] = {}
         for playlist in playlists:
-            title = playlist.get("title", "")
+            title = normalize_series_title(playlist.get("title", ""))
             playlist_tracks = playlist.get("tracks", [])
             # The playlists listing sometimes truncates the track array —
             # re-fetch the full playlist when that happens.

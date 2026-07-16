@@ -12,6 +12,7 @@ import httpx
 
 from ..config import settings
 from ..models import ClassItem, SourceRef, SourceType
+from .series_names import normalize_series_title
 
 log = logging.getLogger(__name__)
 
@@ -93,7 +94,7 @@ async def fetch_youtube_classes() -> list[ClassItem]:
 
         video_id_to_series: dict[str, set[str]] = {}
         for playlist in taggable_playlists:
-            title = playlist["snippet"]["title"]
+            title = normalize_series_title(playlist["snippet"]["title"])
             try:
                 items = await _all_playlist_items(client, playlist["id"], part="contentDetails")
             except httpx.HTTPStatusError as exc:
