@@ -222,31 +222,44 @@ export default function App() {
 
   const openDetail = (item) => {
     setSelectedId(item.id);
-    // Video classes have no separate "preview" step worth showing: the detail
-    // screen (ClassDetail) is just a static poster with a Play button, and
-    // VideoPlayer already surfaces the same title/series/description above
-    // the live embed. Routing video taps straight to "video" collapses what
-    // used to be "tap row -> poster -> tap Play -> video actually loads"
-    // into a single tap, matching the row's dedicated Play button which
-    // already jumps straight to "video" via playItem(). Audio classes keep
-    // going through "detail" first since there's no autoplaying embed there
-    // — the poster screen is the only place to read the description before
-    // committing to stream audio.
-    setScreen(item.types.includes("video") ? "video" : "detail");
+    // Video-only classes have no separate "preview" step worth showing (the
+    // detail screen is just a static poster with a Play button duplicating
+    // what VideoPlayer already surfaces above the live embed), so those jump
+    // straight to "video". Everything else goes through "detail" first:
+    // audio-only classes because that's the only place to read the
+    // description before streaming, and classes with BOTH a video and an
+    // audio recording (e.g. a YouTube upload plus its SoundCloud re-upload)
+    // because that's where the user picks which format to play — jumping
+    // straight to video would silently hide the audio option entirely.
+    const hasOnlyVideo = item.types.includes("video") && !item.types.includes("audio");
+    setScreen(hasOnlyVideo ? "video" : "detail");
   };
 
-  const playItem = (item) => {
-    if (item.types.includes("video")) {
-      setSelectedId(item.id);
-      setScreen("video");
-      return;
-    }
+  const playVideo = (item) => {
+    setSelectedId(item.id);
+    setScreen("video");
+  };
+
+  const playAudio = (item) => {
     if (audio.classId === item.id) {
       togglePlay();
       return;
     }
     const src = item.sources.find((s) => s.type === "audio");
     setAudio({ classId: item.id, playing: true, currentTime: 0, duration: src?.duration_sec || 0 });
+  };
+
+  // Quick-play shortcut for the row's round Play button in the browse list:
+  // video is the default when a class has both formats (it's the richer
+  // experience and matches what used to happen before formats were split),
+  // audio otherwise. The explicit choice between the two lives on the detail
+  // screen (see ClassDetail's Watch/Listen buttons below).
+  const playItem = (item) => {
+    if (item.types.includes("video")) {
+      playVideo(item);
+    } else {
+      playAudio(item);
+    }
   };
 
   const handleBack = () => {
@@ -317,7 +330,8 @@ export default function App() {
             onToggleSave={() => toggleSaved(selectedItem.id)}
             onShare={() => setShareItem(selectedItem)}
             onDownload={() => setToast(`Downloading "${selectedItem.title}"…`)}
-            onPlay={() => playItem(selectedItem)}
+            onPlayVideo={() => playVideo(selectedItem)}
+            onPlayAudio={() => playAudio(selectedItem)}
           />
         )}
 

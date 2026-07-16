@@ -1,11 +1,22 @@
 import { placeholderStyle } from "../lib/placeholder";
 import { formatDate, primaryDuration } from "../lib/format";
-import { ChevronLeftIcon, PlayIcon, HeartIcon, ShareIcon, DownloadIcon } from "./icons";
+import { ChevronLeftIcon, PlayIcon, EqualizerIcon, HeartIcon, ShareIcon, DownloadIcon } from "./icons";
 import IconButton from "./IconButton";
 
-export default function ClassDetail({ item, isSaved, onBack, onToggleSave, onShare, onDownload, onPlay }) {
+// This screen only gets reached for audio-only classes and classes that have
+// *both* a video and an audio recording (see openDetail() in App.jsx —
+// video-only classes skip straight to the video screen since there's no
+// choice to make). So the only two shapes this component needs to handle
+// are "audio only" and "audio + video".
+export default function ClassDetail({ item, isSaved, onBack, onToggleSave, onShare, onDownload, onPlayVideo, onPlayAudio }) {
+  const hasVideo = item.types.includes("video");
+  const hasAudio = item.types.includes("audio");
   const duration = primaryDuration(item.sources);
   const metaLine = [item.series[0], formatDate(item.published_at), duration].filter(Boolean).join(" · ");
+  // Thumbnail tap defaults to whichever format is primary — video when both
+  // are available (it's a visual poster, so "watch" is the intuitive tap),
+  // audio otherwise.
+  const onThumbnailPlay = hasVideo ? onPlayVideo : onPlayAudio;
 
   return (
     <div>
@@ -17,7 +28,7 @@ export default function ClassDetail({ item, isSaved, onBack, onToggleSave, onSha
         <ChevronLeftIcon />
       </button>
 
-      <button onClick={onPlay} className="relative block w-full aspect-[16/10] rounded-detail overflow-hidden mb-4">
+      <button onClick={onThumbnailPlay} className="relative block w-full aspect-[16/10] rounded-detail overflow-hidden mb-4">
         <div
           className="absolute inset-0 bg-cover bg-center"
           style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : placeholderStyle(item.id)}
@@ -44,13 +55,35 @@ export default function ClassDetail({ item, isSaved, onBack, onToggleSave, onSha
       </p>
 
       <div className="flex items-center gap-3">
-        <button
-          onClick={onPlay}
-          className="flex-1 h-12 rounded-full bg-navy text-white flex items-center justify-center gap-2 font-heading font-bold text-[14.5px]"
-        >
-          <PlayIcon />
-          Play class
-        </button>
+        {hasVideo && hasAudio ? (
+          // Both formats exist for this class (e.g. a YouTube recording plus
+          // a SoundCloud re-upload of the same shiur) — let the user pick,
+          // rather than silently always choosing one for them.
+          <>
+            <button
+              onClick={onPlayVideo}
+              className="flex-1 h-12 rounded-full bg-navy text-white flex items-center justify-center gap-2 font-heading font-bold text-[14.5px]"
+            >
+              <PlayIcon />
+              Watch
+            </button>
+            <button
+              onClick={onPlayAudio}
+              className="flex-1 h-12 rounded-full bg-white border border-border-soft text-navy flex items-center justify-center gap-2 font-heading font-bold text-[14.5px]"
+            >
+              <EqualizerIcon width={16} height={16} />
+              Listen
+            </button>
+          </>
+        ) : (
+          <button
+            onClick={onThumbnailPlay}
+            className="flex-1 h-12 rounded-full bg-navy text-white flex items-center justify-center gap-2 font-heading font-bold text-[14.5px]"
+          >
+            <PlayIcon />
+            Play class
+          </button>
+        )}
         <IconButton active={isSaved} onClick={onToggleSave} label="Save">
           <HeartIcon filled={isSaved} />
         </IconButton>
