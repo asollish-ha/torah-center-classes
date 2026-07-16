@@ -17,3 +17,13 @@ export function primaryDuration(sources) {
   const withDuration = sources.find((s) => s.duration_sec);
   return withDuration ? formatDuration(withDuration.duration_sec) : null;
 }
+
+// Classes with a video recording almost always also carry an audio-only
+// source (e.g. the same talk re-uploaded to SoundCloud), so a class's
+// `types` array is often ["audio", "video"]. Displaying that literally as
+// "audio + video" is confusing and makes the Video/Audio filter tabs
+// useless (every video class also matches "Audio"). Treat "has video" as
+// the single, primary type — audio-only applies only when no video exists.
+export function primaryType(types) {
+  return types.includes("video") ? "video" : "audio";
+}

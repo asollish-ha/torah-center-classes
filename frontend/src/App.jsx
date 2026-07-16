@@ -16,6 +16,7 @@ import Toast from "./components/Toast";
 import { fetchClasses } from "./lib/api";
 import { loadSavedIds, saveSavedIds } from "./lib/storage";
 import { categoryForSeries, buildTopicCategories } from "./lib/topics";
+import { primaryType } from "./lib/format";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -97,7 +98,11 @@ export default function App() {
       classes = classes.filter((c) => savedIds.has(c.id));
     }
     if (typeFilter !== "all") {
-      classes = classes.filter((c) => c.types.includes(typeFilter));
+      // A class with a video recording almost always has a duplicate
+      // audio-only source too — treat "has video" as the class's single
+      // primary type so the Video/Audio tabs actually partition the list
+      // instead of both matching every video class.
+      classes = classes.filter((c) => primaryType(c.types) === typeFilter);
     }
     if (seriesFilter !== "All Topics") {
       // seriesFilter can be either an exact series name (from a featured

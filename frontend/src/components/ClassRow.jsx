@@ -1,10 +1,10 @@
 import { placeholderStyle } from "../lib/placeholder";
-import { formatDate, primaryDuration } from "../lib/format";
+import { formatDate, primaryDuration, primaryType } from "../lib/format";
 import { PlayIcon, PauseIcon } from "./icons";
 
 export default function ClassRow({ item, onSelect, onPlay, isPlaying }) {
   const duration = primaryDuration(item.sources);
-  const typeLabel = item.types.join(" + ");
+  const typeLabel = primaryType(item.types);
 
   return (
     <div className="w-full flex items-center gap-3.5 py-3 border-b border-border-soft">
