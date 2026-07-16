@@ -234,6 +234,16 @@ export default function App() {
   };
 
   const playVideo = (item) => {
+    // The audio widget lives outside the screen switch (it's rendered at
+    // the bottom of the app regardless of which screen is active), so
+    // switching to Watch while a track is playing would otherwise leave it
+    // running underneath the video instead of stopping. Pause it directly
+    // via the widget rather than touching `audio` state, since PAUSE fires
+    // the existing event binding that updates state for us.
+    if (audio.playing) {
+      const widget = audioWidgetRef.current;
+      if (widget) widget.pause();
+    }
     setSelectedId(item.id);
     setScreen("video");
   };
