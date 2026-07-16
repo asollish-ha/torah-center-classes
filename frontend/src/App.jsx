@@ -13,8 +13,16 @@ import MiniPlayer from "./components/MiniPlayer";
 import NowPlaying from "./components/NowPlaying";
 import ShareSheet from "./components/ShareSheet";
 import Toast from "./components/Toast";
-import { fetchClasses } from "./lib/api";
-import { loadSavedIds, saveSavedIds, loadProgress, saveProgress, clearProgress } from "./lib/storage";
+import { fetchClasses, soundcloudStreamUrl } from "./lib/api";
+import {
+  loadSavedIds,
+  saveSavedIds,
+  loadProgress,
+  saveProgress,
+  clearProgress,
+  loadAudioRate,
+  saveAudioRate,
+} from "./lib/storage";
 import { categoryForClass, buildTopicCategories } from "./lib/topics";
 
 export default function App() {
@@ -31,11 +39,15 @@ export default function App() {
   const [selectedId, setSelectedId] = useState(null);
   const [showAudioFull, setShowAudioFull] = useState(false);
   const [audio, setAudio] = useState({ classId: null, playing: false, currentTime: 0, duration: 0 });
+  // A native <audio> element's playbackRate (rather than a SoundCloud embed
+  // widget, which has no playback-rate API) is what makes speed control
+  // possible at all — see the audioElRef effect below. Global listening
+  // preference, not per-class, so it persists as-is across tracks.
+  const [audioRate, setAudioRate] = useState(() => loadAudioRate());
   const [shareItem, setShareItem] = useState(null);
   const [toast, setToast] = useState(null);
 
-  const audioIframeRef = useRef(null);
-  const audioWidgetRef = useRef(null);
+  const audioElRef = useRef(null);
   // Mirrors audio.currentTime/duration outside React state so the widget-
   // attach effect's cleanup (and other event bindings) can always read the
   // latest position — state set via setAudio inside a closure created on an
@@ -139,117 +151,128 @@ export default function App() {
     () => feed?.classes.find((c) => c.id === audio.classId) || null,
     [feed, audio.classId]
   );
-  const audioEmbedUrl = audioItem?.sources.find((s) => s.type === "audio")?.embed_url;
+  const audioSrc = audioItem?.sources.find((s) => s.type === "audio");
 
-  // Real playback via the SoundCloud Widget JS API — the hidden <iframe> below
-  // is remounted (via `key`) whenever the track changes, and this effect
-  // attaches a fresh SC.Widget to it and binds real playback events so our
-  // React state mirrors what's actually playing (not a simulated clock).
+  // Real playback via a native <audio> element (rather than the SoundCloud
+  // embed widget) — the element is persistent (rendered once, unconditionally,
+  // below) and this effect just points it at a new track and binds standard
+  // HTMLMediaElement events, so our React state mirrors what's actually
+  // playing. This is what makes playbackRate-based speed control possible;
+  // the SC widget's JS API has no equivalent method.
   useEffect(() => {
-    if (!audioItem || !audioEmbedUrl) return;
+    const el = audioElRef.current;
+    if (!audioItem || !audioSrc || !el) return;
     let cancelled = false;
     const classId = audioItem.id;
     audioProgressRef.current = { currentTime: 0, duration: 0 };
     audioLastPersistRef.current = 0;
 
-    const attach = () => {
-      if (cancelled || !audioIframeRef.current || !window.SC) return;
-      const widget = window.SC.Widget(audioIframeRef.current);
-      audioWidgetRef.current = widget;
-      const { Events } = window.SC.Widget;
-
-      widget.bind(Events.READY, () => {
-        // Resume from wherever the user left off last time, if anywhere.
-        const saved = loadProgress(classId, "audio");
-        if (saved && saved.currentTime > 0) {
-          widget.seekTo(saved.currentTime * 1000);
-          audioProgressRef.current.currentTime = saved.currentTime;
-          setAudio((a) => (a.classId === classId ? { ...a, currentTime: saved.currentTime } : a));
-        }
-        widget.play();
-        widget.getDuration((ms) => {
-          audioProgressRef.current.duration = ms / 1000;
-          setAudio((a) => (a.classId === classId ? { ...a, duration: ms / 1000 } : a));
-        });
-      });
-      widget.bind(Events.PLAY, () =>
-        setAudio((a) => (a.classId === classId ? { ...a, playing: true } : a))
+    const handleLoadedMetadata = () => {
+      if (cancelled) return;
+      // Resume from wherever the user left off last time, if anywhere.
+      const saved = loadProgress(classId, "audio");
+      if (saved && saved.currentTime > 0) {
+        el.currentTime = saved.currentTime;
+        audioProgressRef.current.currentTime = saved.currentTime;
+      }
+      audioProgressRef.current.duration = el.duration || 0;
+      setAudio((a) =>
+        a.classId === classId ? { ...a, currentTime: el.currentTime, duration: el.duration || 0 } : a
       );
-      widget.bind(Events.PAUSE, () => {
-        setAudio((a) => (a.classId === classId ? { ...a, playing: false } : a));
-        saveProgress(classId, "audio", audioProgressRef.current.currentTime, audioProgressRef.current.duration);
-      });
-      widget.bind(Events.FINISH, () => {
-        setAudio((a) => (a.classId === classId ? { ...a, playing: false, currentTime: a.duration } : a));
-        clearProgress(classId, "audio");
-      });
-      widget.bind(Events.PLAY_PROGRESS, (data) => {
-        const t = data.currentPosition / 1000;
-        audioProgressRef.current.currentTime = t;
-        setAudio((a) => (a.classId === classId ? { ...a, currentTime: t } : a));
-        // Throttled write so a hard tab close mid-track (which skips the
-        // PAUSE/cleanup persistence below) doesn't lose more than ~5s.
-        if (t - audioLastPersistRef.current > 5) {
-          audioLastPersistRef.current = t;
-          saveProgress(classId, "audio", t, audioProgressRef.current.duration);
-        }
-      });
+      el.playbackRate = audioRate;
+      el.play().catch(() => {});
+    };
+    const handleTimeUpdate = () => {
+      const t = el.currentTime;
+      audioProgressRef.current.currentTime = t;
+      setAudio((a) => (a.classId === classId ? { ...a, currentTime: t } : a));
+      // Throttled write so a hard tab close mid-track (which skips the
+      // pause/cleanup persistence below) doesn't lose more than ~5s.
+      if (t - audioLastPersistRef.current > 5) {
+        audioLastPersistRef.current = t;
+        saveProgress(classId, "audio", t, audioProgressRef.current.duration);
+      }
+    };
+    const handlePlay = () => setAudio((a) => (a.classId === classId ? { ...a, playing: true } : a));
+    const handlePause = () => {
+      setAudio((a) => (a.classId === classId ? { ...a, playing: false } : a));
+      saveProgress(classId, "audio", audioProgressRef.current.currentTime, audioProgressRef.current.duration);
+    };
+    const handleEnded = () => {
+      setAudio((a) => (a.classId === classId ? { ...a, playing: false, currentTime: a.duration } : a));
+      clearProgress(classId, "audio");
     };
 
-    // Save wherever this track got to when switching away from it (to a
-    // different track, or unmounting entirely) — the PAUSE binding above
-    // already covers explicit pauses, but this also catches switching
-    // straight to a new track without one (e.g. tapping a different class's
-    // quick-play button while this one is still playing).
-    const persistOnTeardown = () => {
+    el.addEventListener("loadedmetadata", handleLoadedMetadata);
+    el.addEventListener("timeupdate", handleTimeUpdate);
+    el.addEventListener("play", handlePlay);
+    el.addEventListener("pause", handlePause);
+    el.addEventListener("ended", handleEnded);
+
+    el.src = soundcloudStreamUrl(audioSrc.id);
+    el.load();
+
+    return () => {
+      cancelled = true;
+      el.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      el.removeEventListener("timeupdate", handleTimeUpdate);
+      el.removeEventListener("play", handlePlay);
+      el.removeEventListener("pause", handlePause);
+      el.removeEventListener("ended", handleEnded);
+      // Save wherever this track got to when switching away from it (to a
+      // different track, or unmounting entirely) — the pause handler above
+      // already covers explicit pauses, but this also catches switching
+      // straight to a new track without one (e.g. tapping a different
+      // class's quick-play button while this one is still playing).
       if (audioProgressRef.current.currentTime > 0) {
         saveProgress(classId, "audio", audioProgressRef.current.currentTime, audioProgressRef.current.duration);
       }
     };
+  }, [audioItem?.id, audioSrc?.id]);
 
-    if (window.SC) {
-      attach();
-      return () => {
-        cancelled = true;
-        persistOnTeardown();
-      };
-    }
-    const pollId = setInterval(() => {
-      if (window.SC) {
-        clearInterval(pollId);
-        attach();
-      }
-    }, 100);
-    return () => {
-      cancelled = true;
-      clearInterval(pollId);
-      persistOnTeardown();
-    };
-  }, [audioItem?.id, audioEmbedUrl]);
+  // Applies a rate change to whatever's currently loaded without having to
+  // re-run (and re-seek/re-autoplay) the track-load effect above — that
+  // effect only fires on track change, so new tracks pick up the current
+  // rate via `audioRate` read directly in handleLoadedMetadata instead.
+  useEffect(() => {
+    const el = audioElRef.current;
+    if (el) el.playbackRate = audioRate;
+  }, [audioRate]);
+
+  const AUDIO_RATE_STEPS = [0.75, 1, 1.25, 1.5, 1.75, 2];
+
+  const cycleAudioRate = () => {
+    setAudioRate((r) => {
+      const idx = AUDIO_RATE_STEPS.indexOf(r);
+      const next = AUDIO_RATE_STEPS[(idx + 1) % AUDIO_RATE_STEPS.length];
+      saveAudioRate(next);
+      return next;
+    });
+  };
 
   const togglePlay = () => {
-    const widget = audioWidgetRef.current;
-    if (!widget) return;
-    if (audio.playing) widget.pause();
-    else widget.play();
+    const el = audioElRef.current;
+    if (!el) return;
+    if (audio.playing) el.pause();
+    else el.play().catch(() => {});
   };
 
   const seekAudio = (t) => {
-    const widget = audioWidgetRef.current;
-    if (!widget) return;
+    const el = audioElRef.current;
+    if (!el) return;
     const clamped = Math.min(Math.max(t, 0), audio.duration);
-    widget.seekTo(clamped * 1000);
+    el.currentTime = clamped;
+    audioProgressRef.current.currentTime = clamped;
     setAudio((a) => ({ ...a, currentTime: clamped }));
   };
 
   const skipAudio = (delta) => {
-    const widget = audioWidgetRef.current;
-    if (!widget) return;
-    widget.getPosition((ms) => {
-      const next = Math.min(Math.max(ms / 1000 + delta, 0), audio.duration);
-      widget.seekTo(next * 1000);
-      setAudio((a) => ({ ...a, currentTime: next }));
-    });
+    const el = audioElRef.current;
+    if (!el) return;
+    const next = Math.min(Math.max(el.currentTime + delta, 0), audio.duration);
+    el.currentTime = next;
+    audioProgressRef.current.currentTime = next;
+    setAudio((a) => ({ ...a, currentTime: next }));
   };
 
   const toggleSaved = (id) => {
@@ -277,22 +300,22 @@ export default function App() {
   };
 
   const playVideo = (item) => {
-    // The audio widget lives outside the screen switch (it's rendered at
+    // The audio element lives outside the screen switch (it's rendered at
     // the bottom of the app regardless of which screen is active), so
     // switching to Watch while a track is playing would otherwise leave it
     // running underneath the video instead of stopping. Pause it directly
-    // via the widget rather than touching `audio` state, since PAUSE fires
-    // the existing event binding that updates state for us.
+    // rather than touching `audio` state, since the pause event fires the
+    // existing event binding that updates state for us.
     if (audio.playing) {
-      const widget = audioWidgetRef.current;
-      if (widget) widget.pause();
+      const el = audioElRef.current;
+      if (el) el.pause();
     }
     setSelectedId(item.id);
     setScreen("video");
   };
 
   // Kicks off a track the app wasn't already playing. Seeds `currentTime`
-  // from any saved progress immediately (rather than waiting for the widget
+  // from any saved progress immediately (rather than waiting for the element
   // to become ready and seek) so the mini player doesn't flash "0:00" before
   // jumping to the resume point.
   const startNewAudioTrack = (item) => {
@@ -324,8 +347,8 @@ export default function App() {
   const ensureAudioPlaying = (item) => {
     if (audio.classId === item.id) {
       if (!audio.playing) {
-        const widget = audioWidgetRef.current;
-        if (widget) widget.play();
+        const el = audioElRef.current;
+        if (el) el.play().catch(() => {});
       }
       return;
     }
@@ -446,16 +469,11 @@ export default function App() {
 
       <BottomTabBar activeTab={activeTab} onTabChange={goHome} />
 
-      {audioItem && audioEmbedUrl && (
-        <iframe
-          key={audioItem.id}
-          ref={audioIframeRef}
-          title="audio-player"
-          src={audioEmbedUrl}
-          allow="autoplay"
-          className="hidden"
-        />
-      )}
+      {/* Persistent (not remounted per-track) — the track-load effect above
+          just points .src at the new track's stream endpoint, which is what
+          lets a rate change survive across tracks and what unlocks
+          playbackRate-based speed control (the SC embed widget had neither). */}
+      <audio ref={audioElRef} className="hidden" preload="metadata" />
 
       {audioItem && !showAudioFull && (
         <MiniPlayer
@@ -471,10 +489,12 @@ export default function App() {
           item={audioItem}
           audio={audio}
           isSaved={savedIds.has(audioItem.id)}
+          rate={audioRate}
           onCollapse={() => setShowAudioFull(false)}
           onTogglePlay={togglePlay}
           onSeek={seekAudio}
           onSkip={skipAudio}
+          onCycleRate={cycleAudioRate}
           onToggleSave={() => toggleSaved(audioItem.id)}
           onShare={() => setShareItem(audioItem)}
           onDownload={() => setToast(`Downloading "${audioItem.title}"…`)}

@@ -73,6 +73,35 @@ def _artwork(track_or_playlist: dict) -> str | None:
     return user_art
 
 
+async def resolve_stream_url(track_id: str) -> str:
+    """Resolves a track's actual, playable (and time-limited) CDN stream URL.
+
+    The public embed widget (w.soundcloud.com/player) doesn't expose a
+    playback-rate API, so speed control needs a real <audio> element instead
+    — which needs an audio file URL, not an iframe. This mirrors what
+    soundcloud.com's own web player does: fetch the track's `media.
+    transcodings`, then trade the "progressive" transcoding's API URL (which
+    itself isn't playable) for the actual signed CloudFront URL.
+    """
+    if not settings.soundcloud_enabled:
+        raise RuntimeError("SoundCloud not configured")
+    async with httpx.AsyncClient(timeout=15) as client:
+        track = await _get(client, f"{API_BASE}/tracks/{track_id}")
+        transcodings = (track.get("media") or {}).get("transcodings", [])
+        progressive = next(
+            (t for t in transcodings if (t.get("format") or {}).get("protocol") == "progressive"),
+            None,
+        )
+        chosen = progressive or (transcodings[0] if transcodings else None)
+        if chosen is None or not chosen.get("url"):
+            raise ValueError(f"No stream transcoding available for track {track_id}")
+        resolved = await _get(client, chosen["url"])
+        stream_url = resolved.get("url")
+        if not stream_url:
+            raise ValueError(f"SoundCloud did not return a stream URL for track {track_id}")
+        return stream_url
+
+
 async def fetch_soundcloud_classes() -> list[ClassItem]:
     if not settings.soundcloud_enabled:
         log.info("SoundCloud not configured (missing client_id or username) — skipping.")

@@ -3,12 +3,15 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Query
+import httpx
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse
 
 from .cache import feed_cache
 from .config import settings
 from .models import Feed, SourceType
+from .services.soundcloud import resolve_stream_url
 
 logging.basicConfig(level=logging.INFO)
 
@@ -78,6 +81,27 @@ def get_classes(
 def get_series() -> list[str]:
     feed = feed_cache.feed
     return feed.series if feed else []
+
+
+@app.get("/api/stream/soundcloud/{track_id}")
+async def stream_soundcloud(track_id: str) -> RedirectResponse:
+    """Redirects to a track's signed, directly-playable CDN stream URL.
+
+    A native <audio> element needs an actual audio file URL (to support
+    playbackRate speed control, which the SoundCloud embed widget doesn't
+    expose) — the client points its <audio src> at this endpoint instead of
+    calling SoundCloud directly, since the signed URL requires a fresh,
+    server-side resolution each time and shouldn't be resolved client-side.
+    """
+    try:
+        url = await resolve_stream_url(track_id)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except httpx.HTTPStatusError as exc:
+        raise HTTPException(502, f"SoundCloud request failed: {exc}") from exc
+    return RedirectResponse(url, status_code=302)
 
 
 @app.post("/api/refresh", response_model=Feed)

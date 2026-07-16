@@ -16,3 +16,10 @@ export async function fetchHealth() {
   if (!res.ok) throw new Error(`Health check failed (${res.status})`);
   return res.json();
 }
+
+// Points a native <audio> element's src at this instead of resolving
+// SoundCloud's signed CDN URL client-side — the signature is short-lived and
+// tied to server-side resolution, and this endpoint 302-redirects to it.
+export function soundcloudStreamUrl(trackId) {
+  return `${API_BASE}/stream/soundcloud/${trackId}`;
+}

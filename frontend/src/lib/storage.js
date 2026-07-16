@@ -1,5 +1,6 @@
 const SAVED_IDS_KEY = "torah-center-saved-ids";
 const PROGRESS_KEY = "torah-center-progress";
+const AUDIO_RATE_KEY = "torah-center-audio-rate";
 
 // Below this many seconds in, there's nothing worth resuming — treat it the
 // same as never having started.
@@ -77,4 +78,25 @@ export function clearProgress(classId, type) {
   const map = loadProgressMap();
   delete map[progressKey(classId, type)];
   saveProgressMap(map);
+}
+
+// Playback speed is a global listening preference (not per-class, unlike
+// progress) — someone who prefers 1.5x wants that for every class, not just
+// the one they set it on.
+export function loadAudioRate() {
+  try {
+    const raw = localStorage.getItem(AUDIO_RATE_KEY);
+    const rate = raw ? parseFloat(raw) : 1;
+    return Number.isFinite(rate) && rate > 0 ? rate : 1;
+  } catch {
+    return 1;
+  }
+}
+
+export function saveAudioRate(rate) {
+  try {
+    localStorage.setItem(AUDIO_RATE_KEY, String(rate));
+  } catch {
+    // localStorage unavailable — rate preference just won't persist
+  }
 }

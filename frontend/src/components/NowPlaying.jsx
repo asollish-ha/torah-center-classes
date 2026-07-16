@@ -12,10 +12,12 @@ export default function NowPlaying({
   item,
   audio,
   isSaved,
+  rate,
   onCollapse,
   onTogglePlay,
   onSeek,
   onSkip,
+  onCycleRate,
   onToggleSave,
   onShare,
   onDownload,
@@ -75,6 +77,14 @@ export default function NowPlaying({
             <Forward15Icon />
           </button>
         </div>
+
+        <button
+          onClick={onCycleRate}
+          aria-label={`Playback speed: ${rate}x. Tap to change.`}
+          className="px-4 py-1.5 rounded-full bg-white/15 text-white text-[13px] font-bold mb-8"
+        >
+          {rate}x speed
+        </button>
 
         <div className="flex items-center gap-4">
           <button
