@@ -19,18 +19,16 @@ import re
 
 from ..models import ClassItem
 
-# Curated, in the order they should be presented to the user.
+# Curated, alphabetical — the order they're presented to the user.
 ALL_TOPICS: list[str] = [
-    "Parsha",
+    "Ethics",
     "Halacha",
     "History",
     "Holidays",
-    "Prayer",
-    "Ethics",
-    "Kabbalah",
     "Israel",
-    "Relationships",
-    "Community",
+    "Kabbalah",
+    "Parsha",
+    "Prayer",
 ]
 
 # The 54 weekly Torah portions (including the standard combined
@@ -91,14 +89,6 @@ TOPIC_KEYWORDS: dict[str, list[str]] = {
     "Israel": [
         "israel", "zionism", "zionist", "jerusalem", "holy land", "idf",
         "aliyah", "am yisrael",
-    ],
-    "Relationships": [
-        "relationship", "marriage", "shalom bayit", "dating", "parenting",
-        "spouse", "love and marriage", "shidduch", "raising children",
-    ],
-    "Community": [
-        "community", "chesed", "kindness", "tzedakah", "charity",
-        "outreach", "achdut", "unity", "volunteer",
     ],
 }
 
