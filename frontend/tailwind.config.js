@@ -35,11 +35,13 @@ export default {
       },
       fontFamily: {
         heading: ["Montserrat", "sans-serif"],
-        body: ["Urbanist", "sans-serif"],
         // Sans-serif with rounded stroke terminals (the T's strokes end in a
-        // soft curve instead of a sharp flat corner) — used for transcript
-        // text and track source labels, where that softer letterform suits
-        // longer prose without switching to a serif.
+        // soft curve instead of a sharp flat corner) — used for all subtitle
+        // / secondary text app-wide (bold titles stay on font-heading).
+        body: ["Nunito", "sans-serif"],
+        // Same typeface as font-body — kept as a separate alias so the
+        // player/caption components can name their intent explicitly
+        // without depending on body's definition matching.
         transcript: ["Nunito", "sans-serif"],
       },
       borderRadius: {
