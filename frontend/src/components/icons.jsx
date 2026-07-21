@@ -80,6 +80,19 @@ export const Rewind15Icon = (props) => (
   </svg>
 );
 
+export const SparkleIcon = (props) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" {...props}>
+    <path d="M12 2.5l1.9 5.6 5.6 1.9-5.6 1.9L12 17.5l-1.9-5.6-5.6-1.9 5.6-1.9L12 2.5z" />
+    <path d="M19 15l.9 2.6 2.6.9-2.6.9-.9 2.6-.9-2.6-2.6-.9 2.6-.9.9-2.6z" />
+  </svg>
+);
+
+export const CloseIcon = (props) => (
+  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" {...props}>
+    <path d="M6 6l12 12M18 6L6 18" />
+  </svg>
+);
+
 export const Forward15Icon = (props) => (
   <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
     <path d="M20 12a8 8 0 1 0-2.5 5.8" />

@@ -13,6 +13,8 @@ import MiniPlayer from "./components/MiniPlayer";
 import NowPlaying from "./components/NowPlaying";
 import ShareSheet from "./components/ShareSheet";
 import Toast from "./components/Toast";
+import MoodPicker from "./components/MoodPicker";
+import { SparkleIcon, CloseIcon } from "./components/icons";
 import { fetchClasses, soundcloudStreamUrl } from "./lib/api";
 import {
   loadSavedIds,
@@ -34,6 +36,8 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [seriesFilter, setSeriesFilter] = useState("Topics");
+  const [moodFilter, setMoodFilter] = useState(null);
+  const [showMoodPicker, setShowMoodPicker] = useState(false);
 
   const [screen, setScreen] = useState("browse"); // browse | detail | video
   const [selectedId, setSelectedId] = useState(null);
@@ -140,8 +144,11 @@ export default function App() {
           c.series.some((s) => s.toLowerCase().includes(needle))
       );
     }
+    if (moodFilter) {
+      classes = classes.filter((c) => c.moods.includes(moodFilter));
+    }
     return classes;
-  }, [feed, activeTab, typeFilter, seriesFilter, searchQuery, savedIds]);
+  }, [feed, activeTab, typeFilter, seriesFilter, searchQuery, moodFilter, savedIds]);
 
   const selectedItem = useMemo(
     () => feed?.classes.find((c) => c.id === selectedId) || null,
@@ -395,6 +402,36 @@ export default function App() {
             <MobileHeader />
             <SearchBar value={searchQuery} onChange={setSearchQuery} />
 
+            <button
+              onClick={() => setShowMoodPicker(true)}
+              className="w-full flex items-center gap-3 rounded-[16px] bg-sidebar px-4 py-3.5 mb-4 text-left"
+            >
+              <div className="shrink-0 w-9 h-9 rounded-full bg-white/15 text-teal flex items-center justify-center">
+                <SparkleIcon />
+              </div>
+              <div className="min-w-0">
+                <div className="font-heading font-bold text-[14px] text-white truncate">
+                  What's your inspiration today?
+                </div>
+                <div className="font-body text-[12.5px] text-white/60 truncate">
+                  Find classes that match your mood
+                </div>
+              </div>
+            </button>
+
+            {moodFilter && (
+              <div className="flex items-center gap-2 mb-4">
+                <span className="font-body text-[12.5px] text-text-secondary">Showing:</span>
+                <button
+                  onClick={() => setMoodFilter(null)}
+                  className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full bg-chip-active text-teal text-[12.5px] font-body font-semibold"
+                >
+                  {moodFilter}
+                  <CloseIcon width={13} height={13} />
+                </button>
+              </div>
+            )}
+
             {activeTab === "home" && <PlaylistsRow playlists={playlists} onSelect={setSeriesFilter} />}
 
             <div className="flex items-center justify-between gap-3 mb-4">
@@ -502,6 +539,20 @@ export default function App() {
       )}
 
       {shareItem && <ShareSheet item={shareItem} onClose={() => setShareItem(null)} onToast={setToast} />}
+
+      {showMoodPicker && (
+        <MoodPicker
+          moods={feed?.moods || []}
+          onSelect={(mood) => {
+            setMoodFilter(mood);
+            setShowMoodPicker(false);
+            setActiveTab("home");
+            setScreen("browse");
+            setSelectedId(null);
+          }}
+          onClose={() => setShowMoodPicker(false)}
+        />
+      )}
 
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}
     </div>

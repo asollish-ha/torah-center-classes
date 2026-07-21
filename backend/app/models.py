@@ -31,6 +31,9 @@ class ClassItem(BaseModel):
     series: list[str] = Field(default_factory=list)
     types: list[SourceType] = Field(default_factory=list)
     sources: list[SourceRef] = Field(default_factory=list)
+    # Keyword-tagged moods (e.g. "Gratitude", "Comfort & Healing") — see
+    # services/moods.py. Computed at cache-refresh time, not user-editable.
+    moods: list[str] = Field(default_factory=list)
 
 
 class Feed(BaseModel):
@@ -39,3 +42,8 @@ class Feed(BaseModel):
     generated_at: datetime
     stale: bool = False
     errors: list[str] = Field(default_factory=list)
+    # The full curated mood taxonomy (services.moods.ALL_MOODS), so the
+    # frontend's "What's your inspiration today?" picker always shows every
+    # mood — including ones with zero matches in the current feed — without
+    # a second round trip.
+    moods: list[str] = Field(default_factory=list)
