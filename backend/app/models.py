@@ -34,6 +34,10 @@ class ClassItem(BaseModel):
     # Keyword-tagged moods (e.g. "Gratitude", "Comfort & Healing") — see
     # services/moods.py. Computed at cache-refresh time, not user-editable.
     moods: list[str] = Field(default_factory=list)
+    # Keyword-tagged subjects (e.g. "Parsha", "Halacha") — see
+    # services/topics.py. Powers the "Topics" filter dropdown. Computed at
+    # cache-refresh time, not user-editable.
+    topics: list[str] = Field(default_factory=list)
 
 
 class Feed(BaseModel):
@@ -47,3 +51,6 @@ class Feed(BaseModel):
     # mood — including ones with zero matches in the current feed — without
     # a second round trip.
     moods: list[str] = Field(default_factory=list)
+    # The full curated topic taxonomy (services.topics.ALL_TOPICS), same
+    # rationale — powers the "Topics" dropdown.
+    topics: list[str] = Field(default_factory=list)

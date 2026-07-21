@@ -19,6 +19,7 @@ from .models import Feed
 from .services.matcher import merge_classes
 from .services.moods import ALL_MOODS, attach_moods
 from .services.soundcloud import fetch_soundcloud_classes
+from .services.topics import ALL_TOPICS, attach_topics
 from .services.youtube import fetch_youtube_classes
 
 log = logging.getLogger(__name__)
@@ -37,7 +38,7 @@ class FeedCache:
     async def refresh(self) -> Feed:
         async with self._lock:
             if not settings.youtube_enabled and not settings.soundcloud_enabled:
-                classes = attach_moods(list(DEMO_CLASSES))
+                classes = attach_topics(attach_moods(list(DEMO_CLASSES)))
                 feed = Feed(
                     classes=classes,
                     series=sorted({s for c in classes for s in c.series}),
@@ -45,6 +46,7 @@ class FeedCache:
                     stale=False,
                     errors=["No YouTube/SoundCloud credentials configured — showing demo data."],
                     moods=list(ALL_MOODS),
+                    topics=list(ALL_TOPICS),
                 )
                 self._feed = feed
                 log.warning("No credentials configured — serving demo data.")
@@ -66,7 +68,7 @@ class FeedCache:
                 log.exception("SoundCloud fetch failed")
                 errors.append(f"SoundCloud: {exc}")
 
-            classes = attach_moods(merge_classes(youtube_classes, soundcloud_classes))
+            classes = attach_topics(attach_moods(merge_classes(youtube_classes, soundcloud_classes)))
             all_series = sorted({s for c in classes for s in c.series})
 
             feed = Feed(
@@ -76,6 +78,7 @@ class FeedCache:
                 stale=False,
                 errors=errors,
                 moods=list(ALL_MOODS),
+                topics=list(ALL_TOPICS),
             )
 
             # If this refresh produced nothing but we already had a good feed,

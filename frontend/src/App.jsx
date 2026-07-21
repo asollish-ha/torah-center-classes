@@ -25,7 +25,6 @@ import {
   loadAudioRate,
   saveAudioRate,
 } from "./lib/storage";
-import { categoryForClass, buildTopicCategories } from "./lib/topics";
 
 export default function App() {
   const [activeTab, setActiveTab] = useState("home");
@@ -112,7 +111,11 @@ export default function App() {
     return [...bySeries.values()].sort((a, b) => (a.mostRecent < b.mostRecent ? 1 : -1));
   }, [feed]);
 
-  const topicCategories = useMemo(() => buildTopicCategories(feed?.series || []), [feed]);
+  // The curated Topics taxonomy (Parsha, Halacha, ...) rides along on the
+  // feed itself — see services/topics.py — rather than being derived from
+  // series names client-side, so it always reflects the same taxonomy the
+  // backend tagged classes against.
+  const topicCategories = feed?.topics || [];
 
   const filteredClasses = useMemo(() => {
     if (!feed) return [];
@@ -129,10 +132,11 @@ export default function App() {
     }
     if (seriesFilter !== "Topics") {
       // seriesFilter can be either an exact series name (from a featured
-      // playlist card) or a broad topic category (from the dropdown) — a
-      // class matches if either kind of value applies to it.
+      // playlist card) or a curated topic tag (from the dropdown, e.g.
+      // "Parsha" or "Halacha" — see services/topics.py) — a class matches
+      // if either kind of value applies to it.
       classes = classes.filter(
-        (c) => c.series.includes(seriesFilter) || categoryForClass(c) === seriesFilter
+        (c) => c.series.includes(seriesFilter) || c.topics.includes(seriesFilter)
       );
     }
     if (searchQuery.trim()) {

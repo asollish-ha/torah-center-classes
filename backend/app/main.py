@@ -56,6 +56,7 @@ def get_classes(
     type: SourceType | None = Query(None, description="Filter by video or audio"),
     series: str | None = Query(None, description="Filter by series/playlist name"),
     mood: str | None = Query(None, description="Filter by mood tag (see /api/moods)"),
+    topic: str | None = Query(None, description="Filter by topic tag (see /api/topics)"),
 ) -> Feed:
     feed = feed_cache.feed
     if feed is None:
@@ -74,6 +75,8 @@ def get_classes(
         classes = [c for c in classes if series in c.series]
     if mood:
         classes = [c for c in classes if mood in c.moods]
+    if topic:
+        classes = [c for c in classes if topic in c.topics]
 
     return Feed(
         classes=classes,
@@ -82,6 +85,7 @@ def get_classes(
         stale=feed.stale,
         errors=feed.errors,
         moods=feed.moods,
+        topics=feed.topics,
     )
 
 
@@ -95,6 +99,12 @@ def get_series() -> list[str]:
 def get_moods() -> list[str]:
     feed = feed_cache.feed
     return feed.moods if feed else []
+
+
+@app.get("/api/topics")
+def get_topics() -> list[str]:
+    feed = feed_cache.feed
+    return feed.topics if feed else []
 
 
 @app.get("/api/stream/soundcloud/{track_id}")
