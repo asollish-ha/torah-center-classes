@@ -40,7 +40,7 @@ export default function NowPlaying({
         </button>
 
         {item.series[0] && (
-          <span className="px-3 py-1 rounded-full bg-white/15 text-teal text-[12px] font-bold mb-6">
+          <span className="font-transcript px-3 py-1 rounded-full bg-white/15 text-teal text-[12px] font-semibold mb-6">
             {item.series[0]}
           </span>
         )}
@@ -51,7 +51,7 @@ export default function NowPlaying({
         />
 
         <h1 className="font-heading font-bold text-[21px] text-white text-center leading-snug mb-1">{item.title}</h1>
-        <div className="text-[13.5px] text-white/60 text-center mb-8">{item.series[0] || ""}</div>
+        <div className="font-transcript text-[13.5px] text-white/60 text-center mb-8">{item.series[0] || ""}</div>
 
         <div className="w-full mb-1.5 cursor-pointer" onClick={handleScrubClick}>
           <div className="h-[5px] rounded-full bg-white/20 overflow-hidden">

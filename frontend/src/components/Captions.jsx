@@ -78,8 +78,8 @@ export default function Captions({ classId, currentTime, onSeek }) {
             key={idx}
             ref={isActive ? activeRef : null}
             onClick={() => onSeek(seg.start)}
-            className={`py-1 cursor-pointer transition-colors text-[14px] leading-relaxed ${
-              isActive ? "text-white font-bold" : "text-white/40 hover:text-white/70"
+            className={`font-transcript py-1 cursor-pointer transition-colors text-[14.5px] leading-relaxed ${
+              isActive ? "text-white font-semibold" : "text-white/40 hover:text-white/70"
             }`}
           >
             {seg.text}

@@ -21,7 +21,7 @@ export default function MiniPlayer({ item, audio, onTogglePlay, onExpand }) {
         />
         <div className="flex-1 min-w-0">
           <div className="font-heading font-bold text-[13px] text-text-primary truncate">{item.title}</div>
-          <div className="text-[11.5px] text-text-secondary truncate">{item.series[0] || ""}</div>
+          <div className="font-transcript text-[11.5px] text-text-secondary truncate">{item.series[0] || ""}</div>
         </div>
         <button
           onClick={(e) => {
