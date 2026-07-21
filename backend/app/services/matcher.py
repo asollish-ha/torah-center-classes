@@ -50,13 +50,12 @@ def merge_classes(youtube_classes: list[ClassItem], soundcloud_classes: list[Cla
             match.sources.extend(audio_item.sources)
             match.types = sorted(set(match.types) | set(audio_item.types), key=lambda t: t.value)
             match.series = sorted(set(match.series) | set(audio_item.series))
-            # Prefer the SoundCloud artwork over the YouTube thumbnail for
-            # classes that have both: it's the same square cover-art style
-            # used for every audio-only class, so a class's thumbnail stays
-            # visually consistent whether or not it also happens to have a
-            # video recording, instead of only "audio-only" classes getting
-            # the SoundCloud look.
-            if audio_item.thumbnail:
+            # Prefer the YouTube thumbnail (a real video frame) over the
+            # SoundCloud artwork for classes that have both — SoundCloud
+            # artwork is often just a candid photo of the teacher rather than
+            # a proper thumbnail, so it should only fill in when there's no
+            # YouTube thumbnail to show at all (audio-only classes).
+            if not match.thumbnail and audio_item.thumbnail:
                 match.thumbnail = audio_item.thumbnail
         else:
             unmatched_audio.append(audio_item)
