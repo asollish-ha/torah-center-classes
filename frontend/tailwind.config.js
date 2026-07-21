@@ -36,10 +36,11 @@ export default {
       fontFamily: {
         heading: ["Montserrat", "sans-serif"],
         body: ["Urbanist", "sans-serif"],
-        // Serif with curved/bracketed serifs (the T's foot curves instead of
-        // reading as a flat crossbar) — used for transcript text and track
-        // source labels, where that softer letterform suits longer prose.
-        transcript: ["Lora", "serif"],
+        // Sans-serif with rounded stroke terminals (the T's strokes end in a
+        // soft curve instead of a sharp flat corner) — used for transcript
+        // text and track source labels, where that softer letterform suits
+        // longer prose without switching to a serif.
+        transcript: ["Nunito", "sans-serif"],
       },
       borderRadius: {
         card: "16px",
