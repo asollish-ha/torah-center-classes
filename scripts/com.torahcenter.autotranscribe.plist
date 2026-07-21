@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  LaunchAgent for scripts/auto_transcribe.py.
+
+  Install (one-time):
+    cp scripts/com.torahcenter.autotranscribe.plist ~/Library/LaunchAgents/
+    launchctl load ~/Library/LaunchAgents/com.torahcenter.autotranscribe.plist
+
+  Uninstall:
+    launchctl unload ~/Library/LaunchAgents/com.torahcenter.autotranscribe.plist
+    rm ~/Library/LaunchAgents/com.torahcenter.autotranscribe.plist
+
+  Runs auto_transcribe.py every 3 hours (10800s) while this Mac is on/awake,
+  plus once immediately when loaded (RunAtLoad). launchd simply skips the
+  scheduled tick if the Mac is asleep and does NOT queue it up — it just
+  resumes on the next tick after wake, same as StartInterval jobs generally
+  behave. The script's own logs/auto_transcribe.lock guards against two runs
+  overlapping if one run takes longer than 3 hours.
+
+  StandardOutPath/StandardErrorPath below only catch launchd-level failures
+  (e.g. python3 not found); the script's own detailed log goes to
+  logs/auto_transcribe.log via Python logging regardless.
+
+  This does NOT pass --push, so scheduled runs commit locally but never push
+  to origin/main / redeploy the live site on their own — that stays a manual
+  step until you're comfortable automating it too.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.torahcenter.autotranscribe</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>/Users/arisollish/Documents/Claude/Home Assistant/torah-center-classes/scripts/auto_transcribe.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/arisollish/Documents/Claude/Home Assistant/torah-center-classes</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <key>StartInterval</key>
+    <integer>10800</integer>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/arisollish/Documents/Claude/Home Assistant/torah-center-classes/logs/launchd.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/arisollish/Documents/Claude/Home Assistant/torah-center-classes/logs/launchd.err.log</string>
+</dict>
+</plist>

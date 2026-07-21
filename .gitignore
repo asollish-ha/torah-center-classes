@@ -11,3 +11,7 @@ frontend/node_modules/
 frontend/dist/
 frontend/.env
 frontend/.env.local
+
+# auto_transcribe.py runtime output (logs/lockfile regenerate on every
+# scheduled run; only the transcript fixtures it writes get committed)
+logs/
