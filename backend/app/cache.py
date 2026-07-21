@@ -30,6 +30,16 @@ class FeedCache:
         self._feed: Feed | None = None
         self._scheduler = AsyncIOScheduler()
         self._lock = asyncio.Lock()
+        # Last-known-good raw fetch per source, kept separately from `_feed`
+        # (which only stores the merged result). A transient failure on one
+        # source (e.g. SoundCloud dropping the connection mid-response) falls
+        # back to these instead of an empty list — otherwise that source's
+        # classes would silently vanish from the merged feed even though the
+        # *other* source still succeeded and the overall class count never
+        # hit zero, so the "feed went fully empty" safeguard below wouldn't
+        # catch it.
+        self._last_youtube_classes: list = []
+        self._last_soundcloud_classes: list = []
 
     @property
     def feed(self) -> Feed | None:
@@ -53,20 +63,36 @@ class FeedCache:
                 return feed
 
             errors: list[str] = []
-            youtube_classes: list = []
-            soundcloud_classes: list = []
 
             try:
                 youtube_classes = await fetch_youtube_classes()
+                self._last_youtube_classes = youtube_classes
             except Exception as exc:  # noqa: BLE001 - surface any upstream failure
                 log.exception("YouTube fetch failed")
                 errors.append(f"YouTube: {exc}")
+                # Deep-copy: merge_classes() mutates ClassItem objects in
+                # place (extends .sources, overwrites .thumbnail), so reusing
+                # the cached objects directly would let sources pile up with
+                # duplicates across repeated failed-fetch cycles.
+                youtube_classes = [c.model_copy(deep=True) for c in self._last_youtube_classes]
+                if youtube_classes:
+                    log.warning(
+                        "Falling back to last-known-good YouTube data (%d classes) for this refresh.",
+                        len(youtube_classes),
+                    )
 
             try:
                 soundcloud_classes = await fetch_soundcloud_classes()
+                self._last_soundcloud_classes = soundcloud_classes
             except Exception as exc:  # noqa: BLE001
                 log.exception("SoundCloud fetch failed")
                 errors.append(f"SoundCloud: {exc}")
+                soundcloud_classes = [c.model_copy(deep=True) for c in self._last_soundcloud_classes]
+                if soundcloud_classes:
+                    log.warning(
+                        "Falling back to last-known-good SoundCloud data (%d classes) for this refresh.",
+                        len(soundcloud_classes),
+                    )
 
             classes = attach_topics(attach_moods(merge_classes(youtube_classes, soundcloud_classes)))
             all_series = sorted({s for c in classes for s in c.series})
