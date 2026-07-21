@@ -23,3 +23,13 @@ export async function fetchHealth() {
 export function soundcloudStreamUrl(trackId) {
   return `${API_BASE}/stream/soundcloud/${trackId}`;
 }
+
+// Returns { class_id, segments: [{ start, end, text }] } or null if no
+// transcript fixture exists yet for this class (prototype feature — most
+// classes won't have one).
+export async function fetchTranscript(classId) {
+  const res = await fetch(`${API_BASE}/classes/${classId}/transcript`);
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`Failed to load transcript (${res.status})`);
+  return res.json();
+}

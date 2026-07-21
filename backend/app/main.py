@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import logging
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Query
@@ -14,6 +16,8 @@ from .models import Feed, SourceType
 from .services.soundcloud import resolve_stream_url
 
 logging.basicConfig(level=logging.INFO)
+
+TRANSCRIPTS_DIR = Path(__file__).parent / "data" / "transcripts"
 
 
 @asynccontextmanager
@@ -102,6 +106,20 @@ async def stream_soundcloud(track_id: str) -> RedirectResponse:
     except httpx.HTTPStatusError as exc:
         raise HTTPException(502, f"SoundCloud request failed: {exc}") from exc
     return RedirectResponse(url, status_code=302)
+
+
+@app.get("/api/classes/{class_id}/transcript")
+def get_transcript(class_id: str) -> dict:
+    """Serves a caption fixture (timestamped transcript segments) for a class,
+    if one has been generated. These are prototype fixtures produced offline
+    (MacWhisper transcription) rather than generated on demand, so a missing
+    file just means this particular class hasn't been transcribed yet."""
+    if "/" in class_id or "\\" in class_id or ".." in class_id:
+        raise HTTPException(400, "Invalid class id")
+    path = TRANSCRIPTS_DIR / f"{class_id}.json"
+    if not path.exists():
+        raise HTTPException(404, "No transcript available for this class")
+    return json.loads(path.read_text())
 
 
 @app.post("/api/refresh", response_model=Feed)

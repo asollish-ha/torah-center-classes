@@ -1,5 +1,6 @@
 import { placeholderStyle } from "../lib/placeholder";
 import { ChevronDownIcon, PlayIcon, PauseIcon, HeartIcon, ShareIcon, DownloadIcon, Rewind15Icon, Forward15Icon } from "./icons";
+import Captions from "./Captions";
 
 function formatTime(sec) {
   const s = Math.max(0, Math.round(sec || 0));
@@ -85,6 +86,8 @@ export default function NowPlaying({
         >
           {rate}x speed
         </button>
+
+        <Captions classId={item.id} currentTime={audio.currentTime} onSeek={onSeek} />
 
         <div className="flex items-center gap-4">
           <button
